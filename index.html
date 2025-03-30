@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="style.css">
+    <script src="javascript.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>مياو</title>
+    <style>
+        /* Added falling hearts animation */
+        .heart {
+            position: absolute;
+            color: #ff69b4;
+            font-size: 20px;
+            animation: fall linear infinite;
+            z-index: -1;
+            opacity: 0.7;
+        }
+
+        @keyframes fall {
+            from {
+                transform: translateY(-100vh) rotate(var(--start-rotate, 0deg));
+            }
+            to {
+                transform: translateY(100vh) rotate(var(--end-rotate, 360deg));
+            }
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #f0f7e6;
+            margin: 0;
+            min-height: 100vh;
+            position: relative;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .game-header {
+            margin: 15px 0;
+            text-align: center;
+            color: #4a752c;
+            padding: 0 10px;
+        }
+
+        .game-header h1 {
+            font-size: 1.8rem;
+            margin: 0.5em 0;
+        }
+
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            color: #6b8e23;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(60px, 1fr));
+            gap: 8px;
+            perspective: 1000px;
+            width: 90%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            width: 100%;
+            height: 0;
+            padding-bottom: 100%;
+            position: relative;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .card-back {
+            background: #c4e3a3;
+            transform: rotateY(0deg);
+        }
+
+        .card-front {
+            background: #ffffff;
+            transform: rotateY(180deg);
+            background-size: cover;
+            background-position: center;
+        }
+
+        .win-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            flex-direction: column;
+            font-size: 2em;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            background: #6b8e23;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        button:hover {
+            background: #5a7720;
+        }
+
+        @media (max-width: 480px) {
+            .game-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .stats {
+                font-size: 0.9rem;
+                gap: 12px;
+            }
+
+            .grid {
+                gap: 6px;
+                width: 95%;
+            }
+
+            button {
+                padding: 12px 24px;
+                font-size: 1.1rem;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .game-header h1 {
+                font-size: 1.3rem;
+            }
+            
+            .stats {
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Orientation handling */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .game-header {
+                margin: 10px 0;
+            }
+            
+            .grid {
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-header">
+        <h1>🌺 مياو 🌺</h1>
+        <div class="stats">
+            <div>Time: <span id="timer">0</span>s</div>
+            <div>Moves: <span id="moves">0</span></div>
+        </div>
+        <button onclick="startGame()">New Game</button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="win-screen" id="winScreen">
+        <h2>شطورة ❤️</h2>
+        <p>Time: <span id="winTime">0</span>s</p>
+        <p>Moves: <span id="winMoves">0</span></p>
+        <button onclick="startGame()">Play Again</button>
+    </div>
+
+    <script>
+        // ======== GAME LOGIC ========
+        const cardContents = [
+            'images/flower1.jpg',
+            'images/flower2.jpg',
+            'images/flower3.jpg',
+            'images/flower4.jpg',
+            'images/flower5.jpg',
+            'images/flower6.jpg',
+            'images/flower7.jpg',
+            'images/flower8.jpg'
+        ];
+
+        let flippedCards = [];
+        let matches = 0;
+        let moves = 0;
+        let timer;
+        let seconds = 0;
+        let gameStarted = false;
+
+
+        // ======== GAME FUNCTIONS ========
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function createGame() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            const doubledCards = shuffleArray([...cardContents, ...cardContents]);
+            
+            doubledCards.forEach((imagePath) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-back"></div>
+                    <div class="card-front" style="background-image: url('${imagePath}')"></div>
+                `;
+                card.addEventListener('click', () => flipCard(card, imagePath));
+                grid.appendChild(card);
+            });
+        }
+
+        function flipCard(card, content) {
+            if (!gameStarted) {
+                gameStarted = true;
+                timer = setInterval(() => {
+                    seconds++;
+                    document.getElementById('timer').textContent = seconds;
+                }, 1000);
+            }
+
+            if (flippedCards.length < 2 && !card.classList.contains('flipped')) {
+                card.classList.add('flipped');
+                flippedCards.push({ card, content });
+
+                if (flippedCards.length === 2) {
+                    moves++;
+                    document.getElementById('moves').textContent = moves;
+                    
+                    if (flippedCards[0].content === flippedCards[1].content) {
+                        matches++;
+                        flippedCards = [];
+                        if (matches === cardContents.length) {
+                            clearInterval(timer);
+                            showWinScreen();
+                        }
+                    } else {
+                        setTimeout(() => {
+                            flippedCards.forEach(c => c.card.classList.remove('flipped'));
+                            flippedCards = [];
+                        }, 1000);
+                    }
+                }
+            }
+        }
+
+        function showWinScreen() {
+            const winScreen = document.getElementById('winScreen');
+            document.getElementById('winTime').textContent = seconds;
+            document.getElementById('winMoves').textContent = moves;
+            winScreen.style.display = 'flex';
+        }
+
+        function startGame() {
+            gameStarted = false;
+            seconds = 0;
+            moves = 0;
+            matches = 0;
+            flippedCards = [];
+            document.getElementById('timer').textContent = '0';
+            document.getElementById('moves').textContent = '0';
+            document.getElementById('winScreen').style.display = 'none';
+            clearInterval(timer);
+            createGame();
+        }
+
+        // Start the game
+        startGame();
+    </script>
+</body>
+</html>
